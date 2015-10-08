@@ -20,7 +20,7 @@
   ],
   "dependencies": {
     "uvisor-lib": "~0.8.0",
-    "mbed-hal-st-stm32cubef4": "tridonic-commbed-hal-st-stm32cubef4#tridonic",
+    "mbed-hal-st-stm32cubef4": "tridonic-com/mbed-hal-st-stm32cubef4#tridonic",
     "mbed-hal": "tridonic-com/mbed-hal#tridonic"
   },
   "targetDependencies": {
