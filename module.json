@@ -20,12 +20,12 @@
   ],
   "dependencies": {
     "uvisor-lib": "~0.8.0",
-    "mbed-hal-st-stm32cubef4": "~0.2.0",
-    "mbed-hal": "*"
+    "mbed-hal-st-stm32cubef4": "tridonic-commbed-hal-st-stm32cubef4#tridonic",
+    "mbed-hal": "tridonic-com/mbed-hal#tridonic"
   },
   "targetDependencies": {
     "stm32f401re": {
-      "mbed-hal-st-stm32f401re": "~0.4.0"
+      "mbed-hal-st-stm32f401re": "tridonic-com/mbed-hal-st-stm32f401re#tridonic"
     },
     "stm32f429zi": {
       "mbed-hal-st-stm32f429zi": "~0.4.0"
