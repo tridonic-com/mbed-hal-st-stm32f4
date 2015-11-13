@@ -42,11 +42,26 @@
 #define FLAG_TIMEOUT ((int)0x1000)
 #define LONG_TIMEOUT ((int)0x8000)
 
-I2C_HandleTypeDef I2cHandle;
-
 int i2c1_inited = 0;
 int i2c2_inited = 0;
 int i2c3_inited = 0;
+
+/* This function handles DMA1 Stream5 global interrupt. */
+void DMA1_Stream5_IRQHandler(void);
+
+/* This function handles DMA1 Stream6 global interrupt. */
+void DMA1_Stream6_IRQHandler(void);
+
+// See I2CSlave.h
+#define NoData         0 // the slave has not been addressed
+#define ReadAddressed  1 // the master has requested a read from this slave (slave = transmitter)
+#define WriteGeneral   2 // the master is writing to all slave
+#define WriteAddressed 3 // the master is writing to this slave (slave = receiver)
+
+/* Private variables ---------------------------------------------------------*/
+I2C_HandleTypeDef I2cHandle;
+DMA_HandleTypeDef hdma_i2c1_rx;
+DMA_HandleTypeDef hdma_i2c1_tx;
 
 void i2c_init(i2c_t *obj, PinName sda, PinName scl)
 {
@@ -159,101 +174,34 @@ inline int i2c_stop(i2c_t *obj)
     return 0;
 }
 
+
+
 int i2c_read(i2c_t *obj, int address, char *data, int length, int stop)
 {
-    I2C_TypeDef *i2c = (I2C_TypeDef *)(obj->i2c);
-    I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
     int timeout;
-    int count;
-    int value;
+    HAL_StatusTypeDef status = HAL_ERROR;
 
-    i2c_start(obj);
+    I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
 
-    // Wait until SB flag is set
-    timeout = FLAG_TIMEOUT;
-    while (__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_SB) == RESET) {
-        timeout--;
-        if (timeout == 0) {
-            return -1;
-        }
-    }
+    timeout = LONG_TIMEOUT;
+    status = HAL_I2C_Master_Receive(&I2cHandle, address, data, length, timeout);
 
-    i2c->DR = __HAL_I2C_7BIT_ADD_READ(address);
-
-
-    // Wait address is acknowledged
-    timeout = FLAG_TIMEOUT;
-    while (__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_ADDR) == RESET) {
-        timeout--;
-        if (timeout == 0) {
-            return -1;
-        }
-    }
-    __HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
-
-    // Read all bytes except last one
-    for (count = 0; count < (length - 1); count++) {
-        value = i2c_byte_read(obj, 0);
-        data[count] = (char)value;
-    }
-
-    // If not repeated start, send stop.
-    // Warning: must be done BEFORE the data is read.
-    if (stop) {
-        i2c_stop(obj);
-    }
-
-    // Read the last byte
-    value = i2c_byte_read(obj, 1);
-    data[count] = (char)value;
-
-    return length;
+	return status;
 }
+
 
 int i2c_write(i2c_t *obj, int address, const char *data, int length, int stop)
 {
-    I2C_TypeDef *i2c = (I2C_TypeDef *)(obj->i2c);
     I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
     int timeout;
     int count;
+    HAL_StatusTypeDef status = HAL_ERROR;
 
-    i2c_start(obj);
+    timeout = LONG_TIMEOUT;
 
-    // Wait until SB flag is set
-    timeout = FLAG_TIMEOUT;
-    while (__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_SB) == RESET) {
-        timeout--;
-        if (timeout == 0) {
-            return -1;
-        }
-    }
+    status = HAL_I2C_Master_Transmit(&I2cHandle, address, data, length, timeout);
 
-    i2c->DR = __HAL_I2C_7BIT_ADD_WRITE(address);
-
-
-    // Wait address is acknowledged
-    timeout = FLAG_TIMEOUT;
-    while (__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_ADDR) == RESET) {
-        timeout--;
-        if (timeout == 0) {
-            return -1;
-        }
-    }
-    __HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
-
-    for (count = 0; count < length; count++) {
-        if (i2c_byte_write(obj, data[count]) != 1) {
-            i2c_stop(obj);
-            return -1;
-        }
-    }
-
-    // If not repeated start, send stop.
-    if (stop) {
-        i2c_stop(obj);
-    }
-
-    return count;
+    return status;
 }
 
 int i2c_byte_read(i2c_t *obj, int last)
@@ -319,6 +267,221 @@ void i2c_reset(i2c_t *obj)
         __I2C3_FORCE_RESET();
         __I2C3_RELEASE_RESET();
     }
+}
+
+
+#if DEVICE_I2CSLAVE
+
+void i2c_slave_address(i2c_t *obj, int idx, uint32_t address, uint32_t mask)
+{
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+    uint16_t tmpreg = 0;
+
+    // Get the old register value
+    tmpreg = I2cHandle.Instance->OAR1;
+    // Reset address bits
+    tmpreg &= 0xFC00;
+    // Set new address
+    tmpreg |= (uint16_t)((uint16_t)address & (uint16_t)0x00FE); // 7-bits
+    // Store the new register value
+    I2cHandle.Instance->OAR1 = tmpreg;
+}
+
+void i2c_slave_mode(i2c_t *obj, int enable_slave)
+{
+    I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+    if (enable_slave) {
+        obj->slave = 1;
+        /* Enable Address Acknowledge */
+        I2cHandle.Instance->CR1 |= I2C_CR1_ACK;
+    }
+    else
+    {
+    	I2cHandle.Instance->CR1 &= ~I2C_CR1_ACK;
+    	obj->slave = 0;
+    }
+}
+
+int i2c_slave_receive(i2c_t *obj)
+{
+    int retValue = NoData;
+    I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+
+    if (__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_BUSY) == 1) {
+        if (__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_ADDR) == 1) {
+            if (__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_TRA) == 1)
+                retValue = ReadAddressed;
+            else
+                retValue = WriteAddressed;
+
+            __HAL_I2C_CLEAR_FLAG(&I2cHandle, I2C_FLAG_ADDR);
+        }
+    }
+
+    return (retValue);
+}
+
+int i2c_slave_read(i2c_t *obj, char *data, int length)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+	uint32_t timeout;
+	timeout = FLAG_TIMEOUT;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+
+	status = HAL_I2C_Slave_Receive(&I2cHandle, data, length, timeout);
+
+	return status;
+}
+
+int i2c_slave_write(i2c_t *obj, const char *data, int length)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+	uint32_t timeout;
+	timeout = FLAG_TIMEOUT;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+
+	status = HAL_I2C_Slave_Transmit(&I2cHandle, data, length, timeout);
+
+	return status;
+}
+#endif // DEVICE_I2CSLAVE
+/**
+  * Initializes the Global MSP.
+  */
+void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
+{
+	if(hi2c->Instance == I2C1)
+	{
+		/* DMA controller clock enable */
+		__DMA1_CLK_ENABLE();
+
+	  /* Peripheral DMA init*/
+
+		hdma_i2c1_rx.Instance = DMA1_Stream5;
+		hdma_i2c1_rx.Init.Channel = DMA_CHANNEL_1;
+		hdma_i2c1_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+		hdma_i2c1_rx.Init.PeriphInc = DMA_PINC_DISABLE;
+		hdma_i2c1_rx.Init.MemInc = DMA_MINC_ENABLE;
+		hdma_i2c1_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+		hdma_i2c1_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+		hdma_i2c1_rx.Init.Mode = DMA_NORMAL;
+		hdma_i2c1_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
+		hdma_i2c1_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+		hdma_i2c1_rx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+		hdma_i2c1_rx.Init.MemBurst = DMA_MBURST_SINGLE;
+		hdma_i2c1_rx.Init.PeriphBurst = DMA_PBURST_SINGLE;
+		HAL_DMA_Init(&hdma_i2c1_rx);
+
+		__HAL_LINKDMA(hi2c,hdmarx,hdma_i2c1_rx);
+
+		hdma_i2c1_tx.Instance = DMA1_Stream6;
+		hdma_i2c1_tx.Init.Channel = DMA_CHANNEL_1;
+		hdma_i2c1_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+		hdma_i2c1_tx.Init.PeriphInc = DMA_PINC_DISABLE;
+		hdma_i2c1_tx.Init.MemInc = DMA_MINC_ENABLE;
+		hdma_i2c1_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+		hdma_i2c1_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+		hdma_i2c1_tx.Init.Mode = DMA_NORMAL;
+		hdma_i2c1_tx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
+		hdma_i2c1_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+		hdma_i2c1_tx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
+		hdma_i2c1_tx.Init.MemBurst = DMA_MBURST_SINGLE;
+		hdma_i2c1_tx.Init.PeriphBurst = DMA_PBURST_SINGLE;
+		HAL_DMA_Init(&hdma_i2c1_tx);
+
+		__HAL_LINKDMA(hi2c,hdmatx,hdma_i2c1_tx);
+
+		/* DMA interrupt init */
+		HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+		HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+		HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+		HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+	}
+}
+
+void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
+{
+	if(hi2c->Instance == I2C1)
+	{
+		/* Peripheral clock disable */
+		__I2C1_CLK_DISABLE();
+
+		/**I2C1 GPIO Configuration
+		PB8     ------> I2C1_SCL
+		PB9     ------> I2C1_SDA
+		*/
+		HAL_GPIO_DeInit(GPIOB, GPIO_PIN_8|GPIO_PIN_9);
+
+		/* Peripheral DMA DeInit*/
+    	HAL_DMA_DeInit(hi2c->hdmarx);
+    	HAL_DMA_DeInit(hi2c->hdmatx);
+	}
+}
+
+/******************************************************************************/
+/* STM32F4xx Peripheral Interrupt Handlers                                    */
+/* Add here the Interrupt Handlers for the used peripherals.                  */
+/* For the available peripheral interrupt handler names,                      */
+/* please refer to the startup file (startup_stm32f4xx.s).                    */
+/******************************************************************************/
+
+/**
+* @brief This function handles DMA1 Stream5 global interrupt.
+*/
+void DMA1_Stream5_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(&hdma_i2c1_rx);
+}
+
+/**
+* @brief This function handles DMA1 Stream6 global interrupt.
+*/
+void DMA1_Stream6_IRQHandler(void)
+{
+  HAL_DMA_IRQHandler(&hdma_i2c1_tx);
+}
+
+/******* Non-Blocking mode: DMA */
+int i2c_master_transmit_DMA(i2c_t *obj, int address, const char *data, int length, int stop)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Master_Transmit_DMA(&I2cHandle, address, data, length);
+
+	return status;
+}
+
+int i2c_master_receive_DMA(i2c_t *obj, int address, char *data, int length, int stop)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Master_Receive_DMA(&I2cHandle, address, data, length);
+
+	return status;
+}
+
+int i2c_slave_transmit_DMA(i2c_t *obj, const char *data, int length)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Slave_Transmit_DMA(&I2cHandle, data, length);
+
+	return status;
+}
+
+int i2c_slave_receive_DMA(i2c_t *obj, char *data, int length)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Slave_Receive_DMA(&I2cHandle, data, length);
+
+	return status;
 }
 
 #endif // DEVICE_I2C
