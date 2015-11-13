@@ -20,8 +20,8 @@
   ],
   "dependencies": {
     "uvisor-lib": "~0.8.0",
-    "mbed-hal-st-stm32cubef4": "tridonic-com/mbed-hal-st-stm32cubef4#tridonic",
-    "mbed-hal": "tridonic-com/mbed-hal#tridonic"
+    "mbed-hal-st-stm32cubef4": "ivan-adzic-tridonic-com/mbed-hal-st-stm32cubef4#i2c-dma",
+    "mbed-hal": "ivan-adzic-tridonic-com/mbed-hal#i2c-dma"
   },
   "targetDependencies": {
     "stm32f401re": {
