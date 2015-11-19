@@ -51,6 +51,8 @@ void DMA1_Stream5_IRQHandler(void);
 
 /* This function handles DMA1 Stream6 global interrupt. */
 void DMA1_Stream6_IRQHandler(void);
+void I2C1_EV_IRQHandler(void);
+void I2C1_ER_IRQHandler(void);
 
 // See I2CSlave.h
 #define NoData         0 // the slave has not been addressed
@@ -398,6 +400,12 @@ void HAL_I2C_MspInit(I2C_HandleTypeDef *hi2c)
 		HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
 		HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
 		HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+
+		/* I2C interrupt init */
+		HAL_NVIC_SetPriority(I2C1_EV_IRQn, 0, 0);
+		HAL_NVIC_EnableIRQ(I2C1_EV_IRQn);
+		HAL_NVIC_SetPriority(I2C1_ER_IRQn, 0, 0);
+		HAL_NVIC_EnableIRQ(I2C1_ER_IRQn);
 	}
 }
 
@@ -407,6 +415,10 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
 	{
 		/* Peripheral clock disable */
 		__I2C1_CLK_DISABLE();
+
+		/* Peripheral interrupt DeInit*/
+		HAL_NVIC_DisableIRQ(I2C1_EV_IRQn);
+		HAL_NVIC_DisableIRQ(I2C1_ER_IRQn);
 
 		/**I2C1 GPIO Configuration
 		PB8     ------> I2C1_SCL
@@ -442,6 +454,93 @@ void DMA1_Stream6_IRQHandler(void)
 {
   HAL_DMA_IRQHandler(&hdma_i2c1_tx);
 }
+
+/**
+* @brief This function handles I2C1 error interrupt.
+*/
+void I2C1_ER_IRQHandler(void)
+{
+  HAL_I2C_ER_IRQHandler(&I2cHandle);
+}
+
+/**
+* @brief This function handles I2C1 event interrupt.
+*/
+void I2C1_EV_IRQHandler(void)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+	uint32_t tmp1 = 0, tmp2 = 0, tmp3 = 0, tmp4 = 0;
+
+	/* Master mode selected */
+	if(__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_MSL) == SET)
+	{
+	//    /* I2C in mode Transmitter -----------------------------------------------*/
+	//    if(__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_TRA) == SET) {}
+	//    /* I2C in mode Receiver --------------------------------------------------*/
+	//    else {}
+	}
+	/* Slave mode selected */
+	else
+	{
+		tmp1 = __HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_ADDR);
+		tmp2 = __HAL_I2C_GET_IT_SOURCE(&I2cHandle, (I2C_IT_EVT));
+		tmp3 = __HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_STOPF);
+		tmp4 = __HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_TRA);
+		/* ADDR set --------------------------------------------------------------*/
+		if((tmp1 == SET) && (tmp2 == SET))
+		{
+			/* Clear ADDR flag */
+			__HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
+			HAL_I2C_SlaveAddressMatchCallback(&I2cHandle);
+		}
+		/* STOPF set --------------------------------------------------------------*/
+		else if((tmp3 == SET) && (tmp2 == SET))
+		{
+			/* Clear STOPF flag */
+			__HAL_I2C_CLEAR_STOPFLAG(&I2cHandle);
+			I2cHandle.State = HAL_I2C_STATE_READY;
+		}
+	}
+}
+
+int i2c_enable_slave_it(i2c_t *obj)
+{
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+
+	if(I2cHandle.State == HAL_I2C_STATE_READY)
+	{
+	    if(__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_BUSY) == SET)
+	    {
+	      return HAL_BUSY;
+	    }
+
+	    /* Process Locked */
+	    __HAL_LOCK(&I2cHandle);
+
+	    //I2cHandle.State = HAL_I2C_STATE_READY;
+	    I2cHandle.ErrorCode = HAL_I2C_ERROR_NONE;
+
+	    /* Enable Address Acknowledge */
+	    I2cHandle.Instance->CR1 |= I2C_CR1_ACK;
+
+	    /* Process Unlocked */
+	    __HAL_UNLOCK(&I2cHandle);
+
+	    /* Note : The I2C interrupts must be enabled after unlocking current process
+	              to avoid the risk of I2C interrupt handle execution before current
+	              process unlock */
+
+	    /* Enable EVT, BUF and ERR interrupt */
+	    __HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT | I2C_IT_ERR);
+
+	    return HAL_OK;
+	}
+	else
+	{
+	   return HAL_BUSY;
+	}
+}
+
 
 /******* Non-Blocking mode: DMA */
 int i2c_master_transmit_DMA(i2c_t *obj, int address, const char *data, int length, int stop)
