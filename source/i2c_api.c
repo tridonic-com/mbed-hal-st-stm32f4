@@ -371,6 +371,101 @@ int i2c_slave_write(i2c_t *obj, const char *data, int length)
 	return status;
 }
 #endif // DEVICE_I2CSLAVE
+
+#ifdef DEVICE_I2C_DMA
+void i2c_register_event_cb(
+		event_cb_t cb_s_rx,
+		event_cb_t cb_s_tx,
+		event_cb_t cb_m_rx,
+		event_cb_t cb_m_tx,
+		event_cb_t cb_e_addr,
+		event_cb_t cb_e_erro)
+{
+	if(cb_s_rx)	g_cb_s_rx = cb_s_rx;
+	if(cb_s_tx)	g_cb_s_tx = cb_s_tx;
+	if(cb_m_rx)	g_cb_m_rx = cb_m_rx;
+	if(cb_m_tx)	g_cb_m_tx = cb_m_tx;
+	if(cb_e_addr) g_cb_e_addr = cb_e_addr;
+	if(cb_e_erro) g_cb_e_erro = cb_e_erro;
+}
+
+int i2c_enable_i2c_it(i2c_t *obj)
+{
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+
+	if(I2cHandle.State == HAL_I2C_STATE_READY)
+	{
+	    if(__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_BUSY) == SET)
+	    {
+	      return HAL_BUSY;
+	    }
+
+	    /* Process Locked */
+	    __HAL_LOCK(&I2cHandle);
+
+	    //I2cHandle.State = HAL_I2C_STATE_READY;
+	    I2cHandle.ErrorCode = HAL_I2C_ERROR_NONE;
+
+	    /* Enable Address Acknowledge */
+	    I2cHandle.Instance->CR1 |= I2C_CR1_ACK;
+
+	    /* Process Unlocked */
+	    __HAL_UNLOCK(&I2cHandle);
+
+	    /* Note : The I2C interrupts must be enabled after unlocking current process
+	              to avoid the risk of I2C interrupt handle execution before current
+	              process unlock */
+
+	    /* Enable EVT, BUF and ERR interrupt | I2C_IT_BUF */
+	    __HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT | I2C_IT_ERR);
+
+	    return HAL_OK;
+	}
+	else
+	{
+	   return HAL_BUSY;
+	}
+}
+
+int i2c_master_transmit_DMA(i2c_t *obj, int address, const unsigned char *data, int length, int stop)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Master_Transmit_DMA(&I2cHandle, address, data, length);
+
+	return status;
+}
+
+int i2c_master_receive_DMA(i2c_t *obj, int address, unsigned char *data, int length, int stop)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Master_Receive_DMA(&I2cHandle, address, data, length);
+
+	return status;
+}
+
+int i2c_slave_transmit_DMA(i2c_t *obj, const unsigned char *data, int length)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Slave_Transmit_DMA(&I2cHandle, data, length);
+
+	return status;
+}
+
+int i2c_slave_receive_DMA(i2c_t *obj, unsigned char *data, int length)
+{
+	HAL_StatusTypeDef status = HAL_ERROR;
+
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+	status = HAL_I2C_Slave_Receive_DMA(&I2cHandle, data, length);
+
+	return status;
+}
+
 /**
   * Initializes the Global MSP.
   */
@@ -519,100 +614,6 @@ void I2C1_EV_IRQHandler(void)
 	}
 }
 
-#ifdef DEVICE_I2C_DMA
-void i2c_register_event_cb(
-		event_cb_t cb_s_rx,
-		event_cb_t cb_s_tx,
-		event_cb_t cb_m_rx,
-		event_cb_t cb_m_tx,
-		event_cb_t cb_e_addr,
-		event_cb_t cb_e_erro)
-{
-	if(cb_s_rx)	g_cb_s_rx = cb_s_rx;
-	if(cb_s_tx)	g_cb_s_tx = cb_s_tx;
-	if(cb_m_rx)	g_cb_m_rx = cb_m_rx;
-	if(cb_m_tx)	g_cb_m_tx = cb_m_tx;
-	if(cb_e_addr) g_cb_e_addr = cb_e_addr;
-	if(cb_e_erro) g_cb_e_erro = cb_e_erro;
-}
-
-int i2c_enable_i2c_it(i2c_t *obj)
-{
-	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
-
-	if(I2cHandle.State == HAL_I2C_STATE_READY)
-	{
-	    if(__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_BUSY) == SET)
-	    {
-	      return HAL_BUSY;
-	    }
-
-	    /* Process Locked */
-	    __HAL_LOCK(&I2cHandle);
-
-	    //I2cHandle.State = HAL_I2C_STATE_READY;
-	    I2cHandle.ErrorCode = HAL_I2C_ERROR_NONE;
-
-	    /* Enable Address Acknowledge */
-	    I2cHandle.Instance->CR1 |= I2C_CR1_ACK;
-
-	    /* Process Unlocked */
-	    __HAL_UNLOCK(&I2cHandle);
-
-	    /* Note : The I2C interrupts must be enabled after unlocking current process
-	              to avoid the risk of I2C interrupt handle execution before current
-	              process unlock */
-
-	    /* Enable EVT, BUF and ERR interrupt | I2C_IT_BUF */
-	    __HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT | I2C_IT_ERR);
-
-	    return HAL_OK;
-	}
-	else
-	{
-	   return HAL_BUSY;
-	}
-}
-
-int i2c_master_transmit_DMA(i2c_t *obj, int address, const unsigned char *data, int length, int stop)
-{
-	HAL_StatusTypeDef status = HAL_ERROR;
-	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
-	status = HAL_I2C_Master_Transmit_DMA(&I2cHandle, address, data, length);
-
-	return status;
-}
-
-int i2c_master_receive_DMA(i2c_t *obj, int address, unsigned char *data, int length, int stop)
-{
-	HAL_StatusTypeDef status = HAL_ERROR;
-
-	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
-	status = HAL_I2C_Master_Receive_DMA(&I2cHandle, address, data, length);
-
-	return status;
-}
-
-int i2c_slave_transmit_DMA(i2c_t *obj, const unsigned char *data, int length)
-{
-	HAL_StatusTypeDef status = HAL_ERROR;
-
-	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
-	status = HAL_I2C_Slave_Transmit_DMA(&I2cHandle, data, length);
-
-	return status;
-}
-
-int i2c_slave_receive_DMA(i2c_t *obj, unsigned char *data, int length)
-{
-	HAL_StatusTypeDef status = HAL_ERROR;
-
-	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
-	status = HAL_I2C_Slave_Receive_DMA(&I2cHandle, data, length);
-
-	return status;
-}
-
 /**
   * @brief  Master Tx Transfer completed callback.
   * @param  hi2c: pointer to a I2C_HandleTypeDef structure that contains
@@ -665,6 +666,7 @@ void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
 void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
 	g_cb_e_erro(hi2c);
 }
+
 #endif //DEVICE_I2C_DMA
 
 #endif // DEVICE_I2C
