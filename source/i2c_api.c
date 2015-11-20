@@ -65,6 +65,14 @@ I2C_HandleTypeDef I2cHandle;
 DMA_HandleTypeDef hdma_i2c1_rx;
 DMA_HandleTypeDef hdma_i2c1_tx;
 
+/* I2C event callbacks */
+event_cb_t g_cb_s_rx = NULL; // callback for Slave reception completed event
+event_cb_t g_cb_s_tx = NULL; // callback for Slave transmission completed event
+event_cb_t g_cb_m_rx = NULL; // callback for Master reception completed event
+event_cb_t g_cb_m_tx = NULL; // callback for Master transmission completed event
+event_cb_t g_cb_e_addr = NULL; // callback for Slave Address Match event
+event_cb_t g_cb_e_erro = NULL; // callback for I2C errors event
+
 void i2c_init(i2c_t *obj, PinName sda, PinName scl)
 {
     // Determine the I2C to use
@@ -271,6 +279,20 @@ void i2c_reset(i2c_t *obj)
     }
 }
 
+void i2c_set_own_address(i2c_t *obj, uint32_t address)
+{
+	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+    uint16_t tmpreg = 0;
+
+    // Get the old register value
+    tmpreg = I2cHandle.Instance->OAR1;
+    // Reset address bits
+    tmpreg &= 0xFC00;
+    // Set new address
+    tmpreg |= (uint16_t)((uint16_t)address & (uint16_t)0x00FE); // 7-bits
+    // Store the new register value
+    I2cHandle.Instance->OAR1 = tmpreg;
+}
 
 #if DEVICE_I2CSLAVE
 
@@ -432,13 +454,6 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
 	}
 }
 
-/******************************************************************************/
-/* STM32F4xx Peripheral Interrupt Handlers                                    */
-/* Add here the Interrupt Handlers for the used peripherals.                  */
-/* For the available peripheral interrupt handler names,                      */
-/* please refer to the startup file (startup_stm32f4xx.s).                    */
-/******************************************************************************/
-
 /**
 * @brief This function handles DMA1 Stream5 global interrupt.
 */
@@ -491,7 +506,8 @@ void I2C1_EV_IRQHandler(void)
 		{
 			/* Clear ADDR flag */
 			__HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
-			HAL_I2C_SlaveAddressMatchCallback(&I2cHandle);
+			/* Call Address Matched callback */
+			g_cb_e_addr(&I2cHandle);
 		}
 		/* STOPF set --------------------------------------------------------------*/
 		else if((tmp3 == SET) && (tmp2 == SET))
@@ -503,7 +519,24 @@ void I2C1_EV_IRQHandler(void)
 	}
 }
 
-int i2c_enable_slave_it(i2c_t *obj)
+#ifdef DEVICE_I2C_DMA
+void i2c_register_event_cb(
+		event_cb_t cb_s_rx,
+		event_cb_t cb_s_tx,
+		event_cb_t cb_m_rx,
+		event_cb_t cb_m_tx,
+		event_cb_t cb_e_addr,
+		event_cb_t cb_e_erro)
+{
+	if(cb_s_rx)	g_cb_s_rx = cb_s_rx;
+	if(cb_s_tx)	g_cb_s_tx = cb_s_tx;
+	if(cb_m_rx)	g_cb_m_rx = cb_m_rx;
+	if(cb_m_tx)	g_cb_m_tx = cb_m_tx;
+	if(cb_e_addr) g_cb_e_addr = cb_e_addr;
+	if(cb_e_erro) g_cb_e_erro = cb_e_erro;
+}
+
+int i2c_enable_i2c_it(i2c_t *obj)
 {
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
 
@@ -530,7 +563,7 @@ int i2c_enable_slave_it(i2c_t *obj)
 	              to avoid the risk of I2C interrupt handle execution before current
 	              process unlock */
 
-	    /* Enable EVT, BUF and ERR interrupt */
+	    /* Enable EVT, BUF and ERR interrupt | I2C_IT_BUF */
 	    __HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT | I2C_IT_ERR);
 
 	    return HAL_OK;
@@ -541,19 +574,16 @@ int i2c_enable_slave_it(i2c_t *obj)
 	}
 }
 
-
-/******* Non-Blocking mode: DMA */
-int i2c_master_transmit_DMA(i2c_t *obj, int address, const char *data, int length, int stop)
+int i2c_master_transmit_DMA(i2c_t *obj, int address, const unsigned char *data, int length, int stop)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
-
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
 	status = HAL_I2C_Master_Transmit_DMA(&I2cHandle, address, data, length);
 
 	return status;
 }
 
-int i2c_master_receive_DMA(i2c_t *obj, int address, char *data, int length, int stop)
+int i2c_master_receive_DMA(i2c_t *obj, int address, unsigned char *data, int length, int stop)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
@@ -563,7 +593,7 @@ int i2c_master_receive_DMA(i2c_t *obj, int address, char *data, int length, int 
 	return status;
 }
 
-int i2c_slave_transmit_DMA(i2c_t *obj, const char *data, int length)
+int i2c_slave_transmit_DMA(i2c_t *obj, const unsigned char *data, int length)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
@@ -573,7 +603,7 @@ int i2c_slave_transmit_DMA(i2c_t *obj, const char *data, int length)
 	return status;
 }
 
-int i2c_slave_receive_DMA(i2c_t *obj, char *data, int length)
+int i2c_slave_receive_DMA(i2c_t *obj, unsigned char *data, int length)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
@@ -582,5 +612,59 @@ int i2c_slave_receive_DMA(i2c_t *obj, char *data, int length)
 
 	return status;
 }
+
+/**
+  * @brief  Master Tx Transfer completed callback.
+  * @param  hi2c: pointer to a I2C_HandleTypeDef structure that contains
+  *         the configuration information for I2C module
+  * @retval None
+  */
+void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	g_cb_m_tx(hi2c);
+}
+
+/**
+  * @brief  Master Rx Transfer completed callback.
+  * @param  hi2c: pointer to a I2C_HandleTypeDef structure that contains
+  *         the configuration information for I2C module
+  * @retval None
+  */
+void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	g_cb_m_rx(hi2c);
+}
+
+/** @brief  Slave Tx Transfer completed callback.
+  * @param  hi2c: pointer to a I2C_HandleTypeDef structure that contains
+  *         the configuration information for I2C module
+  * @retval None
+  */
+void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	g_cb_s_tx(hi2c);
+}
+
+/**
+  * @brief  Slave Rx Transfer completed callback.
+  * @param  hi2c: pointer to a I2C_HandleTypeDef structure that contains
+  *         the configuration information for I2C module
+  * @retval None
+  */
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
+{
+	g_cb_s_rx(hi2c);
+}
+
+/**
+  * @brief  I2C error callback.
+  * @param  hi2c: pointer to a I2C_HandleTypeDef structure that contains
+  *         the configuration information for I2C module
+  * @retval None
+  */
+void HAL_I2C_ErrorCallback(I2C_HandleTypeDef *hi2c) {
+	g_cb_e_erro(hi2c);
+}
+#endif //DEVICE_I2C_DMA
 
 #endif // DEVICE_I2C
