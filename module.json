@@ -25,7 +25,7 @@
   },
   "targetDependencies": {
     "stm32f401re": {
-      "mbed-hal-st-stm32f401re": "tridonic-com/mbed-hal-st-stm32f401re#tridonic"
+      "mbed-hal-st-stm32f401re": "ivan-adzic-tridonic-com/mbed-hal-st-stm32f401re#i2c-dma"
     },
     "stm32f429zi": {
       "mbed-hal-st-stm32f429zi": "~0.4.0"

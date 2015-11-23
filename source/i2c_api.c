@@ -184,8 +184,6 @@ inline int i2c_stop(i2c_t *obj)
     return 0;
 }
 
-
-
 int i2c_read(i2c_t *obj, int address, char *data, int length, int stop)
 {
     int timeout;
