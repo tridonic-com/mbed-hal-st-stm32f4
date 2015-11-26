@@ -425,21 +425,21 @@ int i2c_enable_i2c_it(i2c_t *obj)
 	}
 }
 
-int i2c_master_transmit_DMA(i2c_t *obj, int address, const unsigned char *data, int length, int stop)
+int i2c_master_transmit_DMA(i2c_t *obj, int address, const unsigned char *data, int length, char stop)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
-	status = HAL_I2C_Master_Transmit_DMA(&I2cHandle, address, data, length);
+	status = HAL_I2C_Master_Transmit_DMA(&I2cHandle, address, data, length, stop);
 
 	return status;
 }
 
-int i2c_master_receive_DMA(i2c_t *obj, int address, unsigned char *data, int length, int stop)
+int i2c_master_receive_DMA(i2c_t *obj, int address, unsigned char *data, int length, char stop)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
-	status = HAL_I2C_Master_Receive_DMA(&I2cHandle, address, data, length);
+	status = HAL_I2C_Master_Receive_DMA(&I2cHandle, address, data, length, stop);
 
 	return status;
 }
