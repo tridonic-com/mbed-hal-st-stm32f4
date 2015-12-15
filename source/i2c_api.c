@@ -578,6 +578,7 @@ void I2C1_EV_IRQHandler(void)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 	uint32_t tmp1 = 0, tmp2 = 0, tmp3 = 0, tmp4 = 0;
+	uint16_t dataCnt = 0;
 
 	/* Master mode selected */
 	if(__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_MSL) == SET)
@@ -605,9 +606,25 @@ void I2C1_EV_IRQHandler(void)
 		/* STOPF set --------------------------------------------------------------*/
 		else if((tmp3 == SET) && (tmp2 == SET))
 		{
-			/* Clear STOPF flag */
-			__HAL_I2C_CLEAR_STOPFLAG(&I2cHandle);
-			I2cHandle.State = HAL_I2C_STATE_READY;
+			if(I2cHandle.State == HAL_I2C_STATE_BUSY_RX)
+			{
+				/* Calculate number of received bytes */
+				dataCnt = I2C_DATA_LENGTH_MAX - (hdma_i2c1_rx.Instance->NDTR);
+				printf("size of received data: %d \n \r", dataCnt);
+
+				/* Set actual received size */
+				I2cHandle.XferSize = dataCnt;
+
+				/* Disable DMA Request */
+				I2cHandle.Instance->CR2 &= ~I2C_CR2_DMAEN;
+
+				/* Disable DMA RX Channel */
+				HAL_DMA_Abort(&hdma_i2c1_rx);
+
+				/* Clear STOPF flag */
+				__HAL_I2C_CLEAR_STOPFLAG(&I2cHandle);
+				I2cHandle.State = HAL_I2C_STATE_READY;
+			}
 		}
 	}
 }
