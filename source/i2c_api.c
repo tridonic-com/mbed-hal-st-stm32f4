@@ -583,10 +583,7 @@ void I2C1_EV_IRQHandler(void)
 	/* Master mode selected */
 	if(__HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_MSL) == SET)
 	{
-	//    /* I2C in mode Transmitter -----------------------------------------------*/
-	//    if(__HAL_I2C_GET_FLAG(hi2c, I2C_FLAG_TRA) == SET) {}
-	//    /* I2C in mode Receiver --------------------------------------------------*/
-	//    else {}
+		// None to do here
 	}
 	/* Slave mode selected */
 	else
@@ -595,23 +592,13 @@ void I2C1_EV_IRQHandler(void)
 		tmp2 = __HAL_I2C_GET_IT_SOURCE(&I2cHandle, (I2C_IT_EVT));
 		tmp3 = __HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_STOPF);
 		tmp4 = __HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_TRA);
-		/* ADDR set --------------------------------------------------------------*/
-		if((tmp1 == SET) && (tmp2 == SET))
-		{
-			/* Clear ADDR flag */
-			__HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
-			/* Call Address Matched callback */
-			g_cb_e_addr(&I2cHandle);
-		}
 		/* STOPF set --------------------------------------------------------------*/
-		else if((tmp3 == SET) && (tmp2 == SET))
+		if((tmp3 == SET) && (tmp2 == SET))
 		{
 			if(I2cHandle.State == HAL_I2C_STATE_BUSY_RX)
 			{
 				/* Calculate number of received bytes */
 				dataCnt = I2C_DATA_LENGTH_MAX - (hdma_i2c1_rx.Instance->NDTR);
-				printf("size of received data: %d \n \r", dataCnt);
-
 				/* Set actual received size */
 				I2cHandle.XferSize = dataCnt;
 
@@ -621,10 +608,23 @@ void I2C1_EV_IRQHandler(void)
 				/* Disable DMA RX Channel */
 				HAL_DMA_Abort(&hdma_i2c1_rx);
 
+				/* Configure DMA Stream data length */
+				hdma_i2c1_rx.Instance->NDTR = I2C_DATA_LENGTH_MAX;
+
 				/* Clear STOPF flag */
 				__HAL_I2C_CLEAR_STOPFLAG(&I2cHandle);
 				I2cHandle.State = HAL_I2C_STATE_READY;
 			}
+		}
+
+		/* ADDR set --------------------------------------------------------------*/
+		if((tmp1 == SET) && (tmp2 == SET))
+		{
+
+			/* Clear ADDR flag */
+			__HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
+			/* Call Address Matched callback */
+			g_cb_e_addr(&I2cHandle);
 		}
 	}
 }
