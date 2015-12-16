@@ -620,7 +620,7 @@ void I2C1_EV_IRQHandler(void)
 		/* ADDR set --------------------------------------------------------------*/
 		if((tmp1 == SET) && (tmp2 == SET))
 		{
-
+			I2cHandle.tDir = __HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_TRA);
 			/* Clear ADDR flag */
 			__HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
 			/* Call Address Matched callback */
