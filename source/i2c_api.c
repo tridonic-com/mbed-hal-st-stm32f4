@@ -429,7 +429,15 @@ int i2c_master_transmit_DMA(i2c_t *obj, int address, const unsigned char *data, 
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+
+	/* Disable EVT interrupt */
+    __HAL_I2C_DISABLE_IT(&I2cHandle, I2C_IT_EVT);
+
+	/* Master transmit data */
 	status = HAL_I2C_Master_Transmit_DMA(&I2cHandle, address, data, length, stop);
+
+	/* Enable EVT */
+	__HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT);
 
 	return status;
 }
@@ -439,7 +447,15 @@ int i2c_master_receive_DMA(i2c_t *obj, int address, unsigned char *data, int len
 	HAL_StatusTypeDef status = HAL_ERROR;
 
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
+
+	/* Disable EVT interrupt */
+    __HAL_I2C_DISABLE_IT(&I2cHandle, I2C_IT_EVT);
+
+	/* Master receive data */
 	status = HAL_I2C_Master_Receive_DMA(&I2cHandle, address, data, length, stop);
+
+	/* Enable EVT */
+	__HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT);
 
 	return status;
 }
@@ -576,7 +592,6 @@ void I2C1_ER_IRQHandler(void)
 */
 void I2C1_EV_IRQHandler(void)
 {
-	HAL_StatusTypeDef status = HAL_ERROR;
 	uint32_t tmp1 = 0, tmp2 = 0, tmp3 = 0, tmp4 = 0;
 	uint16_t dataCnt = 0;
 
@@ -620,7 +635,7 @@ void I2C1_EV_IRQHandler(void)
 		/* ADDR set --------------------------------------------------------------*/
 		if((tmp1 == SET) && (tmp2 == SET))
 		{
-			I2cHandle.tDir = __HAL_I2C_GET_FLAG(&I2cHandle, I2C_FLAG_TRA);
+			I2cHandle.tDir = tmp4;
 			/* Clear ADDR flag */
 			__HAL_I2C_CLEAR_ADDRFLAG(&I2cHandle);
 			/* Call Address Matched callback */
@@ -637,6 +652,8 @@ void I2C1_EV_IRQHandler(void)
   */
 void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
+	/* Enable EVT, BUF and ERR interrupt | I2C_IT_BUF */
+	__HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT | I2C_IT_ERR);
 	g_cb_m_tx(hi2c);
 }
 
@@ -648,6 +665,8 @@ void HAL_I2C_MasterTxCpltCallback(I2C_HandleTypeDef *hi2c)
   */
 void HAL_I2C_MasterRxCpltCallback(I2C_HandleTypeDef *hi2c)
 {
+	/* Enable EVT, BUF and ERR interrupt | I2C_IT_BUF */
+	__HAL_I2C_ENABLE_IT(&I2cHandle, I2C_IT_EVT | I2C_IT_ERR);
 	g_cb_m_rx(hi2c);
 }
 
