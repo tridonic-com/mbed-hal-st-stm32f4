@@ -64,6 +64,7 @@ void I2C1_ER_IRQHandler(void);
 I2C_HandleTypeDef I2cHandle;
 DMA_HandleTypeDef hdma_i2c1_rx;
 DMA_HandleTypeDef hdma_i2c1_tx;
+unsigned int I2C_data_length_max = 0;
 
 /* I2C event callbacks */
 event_cb_t g_cb_s_rx = NULL; // callback for Slave reception completed event
@@ -464,6 +465,7 @@ int i2c_slave_transmit_DMA(i2c_t *obj, const unsigned char *data, int length)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
+	I2C_data_length_max = length;
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
 	status = HAL_I2C_Slave_Transmit_DMA(&I2cHandle, data, length);
 
@@ -474,6 +476,7 @@ int i2c_slave_receive_DMA(i2c_t *obj, unsigned char *data, int length)
 {
 	HAL_StatusTypeDef status = HAL_ERROR;
 
+	I2C_data_length_max = length;
 	I2cHandle.Instance = (I2C_TypeDef *)(obj->i2c);
 	status = HAL_I2C_Slave_Receive_DMA(&I2cHandle, data, length);
 
@@ -613,7 +616,7 @@ void I2C1_EV_IRQHandler(void)
 			if(I2cHandle.State == HAL_I2C_STATE_BUSY_RX)
 			{
 				/* Calculate number of received bytes */
-				dataCnt = I2C_DATA_LENGTH_MAX - (hdma_i2c1_rx.Instance->NDTR);
+				dataCnt = I2C_data_length_max - (hdma_i2c1_rx.Instance->NDTR);
 				/* Set actual received size */
 				I2cHandle.XferSize = dataCnt;
 
@@ -624,7 +627,7 @@ void I2C1_EV_IRQHandler(void)
 				HAL_DMA_Abort(&hdma_i2c1_rx);
 
 				/* Configure DMA Stream data length */
-				hdma_i2c1_rx.Instance->NDTR = I2C_DATA_LENGTH_MAX;
+				hdma_i2c1_rx.Instance->NDTR = I2C_data_length_max;
 
 				/* Clear STOPF flag */
 				__HAL_I2C_CLEAR_STOPFLAG(&I2cHandle);
