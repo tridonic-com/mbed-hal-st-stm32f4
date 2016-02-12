@@ -42,13 +42,13 @@ void us_ticker_irq_handler(void);
 
 void timer_irq_handler(void) {
     // Channel 1 for mbed timeout
-    if (__HAL_TIM_GET_ITSTATUS(&TimMasterHandle, TIM_IT_CC1) == SET) {
+    if (__HAL_TIM_GET_FLAG(&TimMasterHandle, TIM_IT_CC1) == SET) {
         __HAL_TIM_CLEAR_IT(&TimMasterHandle, TIM_IT_CC1);
         us_ticker_irq_handler();
     }
 
     // Channel 2 for HAL tick
-    if (__HAL_TIM_GET_ITSTATUS(&TimMasterHandle, TIM_IT_CC2) == SET) {
+    if (__HAL_TIM_GET_FLAG(&TimMasterHandle, TIM_IT_CC2) == SET) {
         __HAL_TIM_CLEAR_IT(&TimMasterHandle, TIM_IT_CC2);
         uint32_t val = __HAL_TIM_GetCounter(&TimMasterHandle);
         if ((val - PreviousVal) >= HAL_TICK_DELAY) {
