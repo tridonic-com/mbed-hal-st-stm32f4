@@ -28,7 +28,7 @@
   },
   "targetDependencies": {
     "stm32f401re": {
-      "mbed-hal-st-stm32f401re": "tridonic-com/mbed-hal-st-stm32f401re#0.4.0-tri-0.0.2"
+      "mbed-hal-st-stm32f401re": "tridonic-com/mbed-hal-st-stm32f401re#0.4.0-tri-0.0.5"
     },
     "stm32f429zi": {
       "mbed-hal-st-stm32f429zi": "^1.0.0"
