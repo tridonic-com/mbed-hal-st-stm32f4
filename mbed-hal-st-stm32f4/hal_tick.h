@@ -49,6 +49,9 @@
 #define TIM_MST_RESET_ON   __TIM5_FORCE_RESET()
 #define TIM_MST_RESET_OFF  __TIM5_RELEASE_RESET()
 
+#define TIM_MST_FREEZE_AT_DEBUG  __HAL_DBGMCU_FREEZE_TIM5()
+
+
 #define HAL_TICK_DELAY (1000) // 1 ms
 
 #ifdef __cplusplus
