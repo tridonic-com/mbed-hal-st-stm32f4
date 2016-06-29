@@ -9,6 +9,15 @@
 
 static uint32_t l_CRC;
 
+/* CRC handler declaration */
+CRC_HandleTypeDef   CRC_HandleStruct;
+
+int Init()
+{
+    __HAL_RCC_CRC_CLK_ENABLE();
+    CRC_HandleStruct.Instance = CRC;
+    HAL_CRC_Init(&CRC_HandleStruct);
+}
 
 int Reset()
 {
