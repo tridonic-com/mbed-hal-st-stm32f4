@@ -35,9 +35,6 @@ int Reset()
 {
     /* Reset CRC Calculation Unit */
     __HAL_CRC_DR_RESET(&CRC_HandleStruct);
-
-    /*HAL_CRC_DeInit(&CRC_HandleStruct);
-    HAL_CRC_Init(&CRC_HandleStruct);*/
 }
 
 int CalcSingle(uint8_t* pui8StartAddress, uint32_t ui32DataSize, uint32_t* pui32CRC)
@@ -81,25 +78,6 @@ int CalcAccumulate(uint8_t* pui8StartAddress, uint32_t ui32DataSize, uint32_t* p
         //pui32StartAddress[i] = __REV(pui32StartAddress[i]);   // DECOMMENTED BECAUSE IT IS NOT NEEDED. DISCUSS WITHN mab TODO!!!
         *pui32CRC = HAL_CRC_Accumulate(&CRC_HandleStruct, &ui32TemporaryDataStorage, 1);
     }
-
-   /*
-
-    // Reverse input bits
-    for (uint32_t i = 0; i < ui32DataSize32Bits; i++)
-    {
-        pui32StartAddress[i] = __RBIT(pui32StartAddress[i]);
-        pui32StartAddress[i] = __REV(pui32StartAddress[i]);
-    }
-
-    *pui32CRC = HAL_CRC_Accumulate(&CRC_HandleStruct, (uint32_t*)pui8StartAddress, ui32DataSize32Bits);
-
-    // Reverse back the data (otherwise it will leave the data changed)
-    for (uint32_t i = 0; i < ui32DataSize32Bits; i++)
-    {
-        pui32StartAddress[i] = __REV(pui32StartAddress[i]);
-        pui32StartAddress[i] = __RBIT(pui32StartAddress[i]);
-    }
-    */
 
     // reverse CRC result before final XOR
     *pui32CRC = __RBIT(*pui32CRC);
