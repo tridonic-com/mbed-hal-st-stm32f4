@@ -1263,9 +1263,12 @@ void HAL_I2C_MspDeInit(I2C_HandleTypeDef* hi2c)
 {
 	if(hi2c->Instance == I2C1)
 	{
+		hi2c->hdmarx->State = HAL_DMA_STATE_RESET;
+		hi2c->hdmatx->State = HAL_DMA_STATE_RESET;
+
 		/* Peripheral DMA DeInit*/
-    	HAL_DMA_DeInit(hi2c->hdmarx);
-    	HAL_DMA_DeInit(hi2c->hdmatx);
+		HAL_DMA_DeInit(hi2c->hdmarx);
+		HAL_DMA_DeInit(hi2c->hdmatx);
 	}
 }
 
