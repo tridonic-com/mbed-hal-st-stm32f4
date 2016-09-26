@@ -154,7 +154,7 @@ static DMA_HandleTypeDef hdma_i2c1_tx;
 static unsigned int I2C_data_length_max = 0;
 
 /* I2C event callbacks */
-event_cb_t g_cb_s_rx = NULL; // callback for Slave reception completed event
+event_cb_t2 g_cb_s_rx = NULL; // callback for Slave reception completed event
 event_cb_t g_cb_s_tx = NULL; // callback for Slave transmission completed event
 event_cb_t g_cb_m_rx = NULL; // callback for Master reception completed event
 event_cb_t g_cb_m_tx = NULL; // callback for Master transmission completed event
@@ -1089,7 +1089,7 @@ void i2c_set_own_address(i2c_t *obj, uint32_t address)
 }
 
 void i2c_register_event_cb(
-		event_cb_t cb_s_rx,
+		event_cb_t2 cb_s_rx,
 		event_cb_t cb_s_tx,
 		event_cb_t cb_m_rx,
 		event_cb_t cb_m_tx,
@@ -1396,9 +1396,9 @@ void HAL_I2C_SlaveTxCpltCallback(I2C_HandleTypeDef *hi2c)
   *         the configuration information for I2C module
   * @retval None
   */
-void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c)
+void HAL_I2C_SlaveRxCpltCallback(I2C_HandleTypeDef *hi2c, uint8_t jb)
 {
-	g_cb_s_rx(hi2c);
+	g_cb_s_rx(hi2c, jb);
 }
 
 /**
